@@ -32,7 +32,7 @@ def parse_args():
     parser.add_argument('-cfg', '--cfg', default=None, type=str, required=True)
     parser.add_argument('-seed', '--seed', default=None)
 
-    parser.add_argument('-data-path', '--data-path', default='/p/home/jusers/wang34/juwels/hai_tfda_wp_2_2/huipo/datasets', type=str)
+    parser.add_argument('-data-path', '--data-path', default='/huipo/datasets', type=str)
     parser.add_argument('-download', '--download', action='store_true')
 
     parser.add_argument('-save_path', '--save_path', default='./saves', type=str)
