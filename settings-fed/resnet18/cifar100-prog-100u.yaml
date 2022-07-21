@@ -1,0 +1,47 @@
+# training settings
+seed: 6660857
+dataset: cifar100
+strategy: progressive
+update-cycle: 100
+batch_size: 20
+test-batch-size: 256
+epochs: 3000
+
+# parameters for logging
+save-freq: 10
+save-model: True
+log-interval: 20
+save-interval: 100
+test-interval: 1
+
+# model settings
+arch: resnet18
+lr_scheduler:
+  type: cosine_decay #multistep #cosine
+  lr: 0.1
+  milestones: [60, 120, 160]
+  gamma: 0.2
+  T_0: 1
+  T_mult: 1
+  eta_min: 0.01
+momentum: 0.9
+weight_decay: 0.0001
+
+# parameter for federated configuration
+epoch-client: 1
+n-client: 500
+n-update-client: 40
+shard_per_user: 2
+noniid: False
+
+# parameters for gradient sparsification, not to use sparsification as default
+sparse: 1
+
+# parameters for quantizing the gradients
+# quantize-option: none, cosine, linear
+# quantize-bits: 2, 4, 8 (lastest bit is 8)
+quantize-option: none
+quantize-clip: 0.01
+quantize-bits: 8
+quantize-unbiased: True
+quantize-hadamard: True
