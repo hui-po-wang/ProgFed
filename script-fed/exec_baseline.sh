@@ -1,4 +1,4 @@
-source /huipo/default_env/activate.sh
+#source /huipo/default_env/activate.sh
 cd ..
 
 # basic settings
