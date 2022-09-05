@@ -1,5 +1,7 @@
 # ProgFed: Effective, Communication, and Computation Efficient Federated Learning by Progressive Training
 
+![alt text](assets/arch.png "Title")
+
 #### [[Paper (ICML 2022)]](https://arxiv.org/abs/2110.05323)
 ------------------------------------
 
