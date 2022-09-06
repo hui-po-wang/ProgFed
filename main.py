@@ -218,8 +218,6 @@ def train(args, global_optim, full_model, subnet_server, subnet, state_server, m
     for id_client in client_samples[:args.n_update_client]:
         current_worker = workers[id_client]
         current_data_loader = current_worker.loader
-        if args.optimization == 'scaffold':
-            state_client = current_worker.state.to(device)
 
         # mimic sending model weights to clients
         start_time = time.time()
@@ -248,9 +246,6 @@ def train(args, global_optim, full_model, subnet_server, subnet, state_server, m
                 if loss < 10:
                     optimizer.zero_grad()
                     loss.backward(retain_graph=True)
-                    if args.optimization == 'scaffold' and not warmup:
-                        lr_local = lr_scheduler.get_lr() if not warmup else args['lr_scheduler']['lr']
-                        adjust_gradient_by_scaffold(subnet.module, state_server, state_client, lr_local, device)
                     optimizer.step()
                 #print("--- %s seconds for one training---" % (time.time() - start_time))
 
@@ -272,23 +267,8 @@ def train(args, global_optim, full_model, subnet_server, subnet, state_server, m
         
         #start_time = time.time()
         compute_client_gradients(subnet_server, subnet.module, buffer, args)
-        if args.optimization == 'scaffold' and not warmup:
-            # This mush be called right after compute_client_gradients
-            lr_local = lr_scheduler.get_lr() if not warmup else args['lr_scheduler']['lr']
-            K = args.epoch_client * np.ceil(len(current_data_loader) / args.batch_size)
-            update_client_state(state_server, state_client, buffer, state_buffer, lr_local, K, device)
-            state_client = current_worker.state.to('cpu')
 
-    #update_model(full_model, buffer, args)
-    # subnet_server shares the same model parameters with model_server;
-    # there is no need to handle copy
-    #start_time = time.time()
-    #update_model(subnet_server, buffer, args)
     update_model_global_optim(global_optim['optim'], subnet_server, buffer, device, args)
-    # TO-DO: implement state updates
-    if args.optimization == 'scaffold' and not warmup:
-        update_server_state(state_server, state_buffer, device, args)
-    #print("--- %s seconds for updating the server model---" % (time.time() - start_time))
     if not warmup:
         lr_scheduler.step()
 
@@ -368,21 +348,12 @@ def main(args):
 
     global_optim = create_server_opt(subnet_server, args)
     
-    if args.optimization == 'scaffold':
-        state_server = copy.deepcopy(subnet_server).to(device)
-        state_server.requires_grad = False
-        # initialize the state of the server
-        state_server.apply(_zero_weights)
-    else:
-        state_server = None
+    state_server = None
     subnet = torch.nn.DataParallel(copy.deepcopy(subnet_server).to(device))
 
     # initialize worker on every client
     for i in range(args.n_client):
         workers[i].set_opt(optim.SGD(params=subnet.parameters(), lr=args['lr_scheduler']['lr'], momentum=args.momentum, weight_decay=args.weight_decay))
-        if args.optimization == 'scaffold':
-            # initialize the state of the clients
-            workers[i].init_state(copy.deepcopy(subnet_server).to(device))
 
     lr_scheduler = LearningScheduler(args)
 
@@ -401,11 +372,6 @@ def main(args):
             if args.strategy != 'svcca':
                 subnet_server = model_server.gen_submodel().to(device)
                 subnet = torch.nn.DataParallel(copy.deepcopy(subnet_server).to(device))
-                if args.optimization == 'scaffold':
-                    state_server = copy.deepcopy(subnet_server).to(device)
-                    state_server.requires_grad = False
-                    # initialize the state of the server
-                    state_server.apply(_zero_weights)
             else:
                 subnet_server.ind = layer_cnt
                 subnet = torch.nn.DataParallel(copy.deepcopy(subnet_server).to(device))
@@ -421,11 +387,6 @@ def main(args):
                     #workers[j].set_opt(optim.SGD(params=subnet.lastest_parameters(), lr=10*args['lr_scheduler']['lr'],
                                         momentum=args.momentum,
                                         weight_decay=args.weight_decay))
-                    '''Disable scaffold during warm-up
-                    if args.optimization == 'scaffold':
-                        # initialize the state of the server
-                        workers[j].init_state(copy.deepcopy(subnet_server).to(device))
-                    '''
                 for w_i in range(args.warmup_epochs):
                     print(f'{w_i}th warmup')
                     cur_cost += sum(p.numel() for p in subnet_server.lastest_parameters())
@@ -450,9 +411,6 @@ def main(args):
                     workers[i].set_opt(optim.SGD(params=subnet.module.trainable_parameters(), lr=args['lr_scheduler']['lr'],
                                         momentum=args.momentum,
                                         weight_decay=args.weight_decay))
-                    if args.optimization == 'scaffold':
-                        # initialize the state of the server
-                        workers[i].init_state(copy.deepcopy(subnet_server).to(device))
             else:
                 raise NotImplementedError()
             #lr_scheduler.set_opt(opt)
