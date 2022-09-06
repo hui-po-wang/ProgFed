@@ -75,6 +75,15 @@ We show that ProgFed is compatible with sparsification and quantization. The con
 
 ```
 
+### Optimization
+ProgFed is compatible with several advanced federated optimizers, e.g, FedProx and FedAdam.
+
+```
+# FedProx
+python main.py -cfg settings-fed/resnet18/fedprox-cifar100-prog-warmup25-375u.yaml
+# FedAdam
+python main.py -cfg settings-fed/resnet18/fedadam-cifar100-prog-warmup25-375u.yaml
+```
 ### Ablation Study
 We provide an ablation study on two critical parameters of ProgFed, namely the number of stages (**S**) and the number iterations (**t**). Note that the last setting always refers to the one used in the main paper, i.e., **S=4**.
 
