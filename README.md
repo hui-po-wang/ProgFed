@@ -2,7 +2,7 @@
 
 ![alt text](assets/arch.png "Title")
 
-#### [[Paper (ICML 2022)]](https://arxiv.org/abs/2110.05323)
+#### [[Paper (ICML 2022)]](https://arxiv.org/abs/2110.05323) [[Project Page]](https://a514514772.github.io/ProgFed/)
 ------------------------------------
 
 ### Citation
@@ -73,4 +73,30 @@ We show that ProgFed is compatible with sparsification and quantization. The con
     ├── cifar100-baseline-l8+s10.yaml
     └── cifar100-baseline-l8+s25.yaml
 
+```
+
+### Ablation Study
+We provide an ablation study on two critical parameters of ProgFed, namely the number of stages (**S**) and the number iterations (**t**). Note that the last setting always refers to the one used in the main paper, i.e., **S=4**.
+
+- Number of stages (**S**)
+```
+├── settings-fed/resnet18
+    ├── cifar100-prog-warmup25-S2.yaml
+    ├── cifar100-prog-warmup25-S2.yaml
+    ├── cifar100-prog-warmup25-S2.yaml
+    ├── cifar100-prog-warmup25-S2.yaml
+    └── cifar100-prog-warmup25-375u.yaml
+```
+- More settings
+```
+├── settings-fed/resnet18
+    ├── cifar100-prog-warmup25-S2-2000t.yaml
+    ├── cifar100-prog-warmup25-S2-2500t.yaml
+    ├── cifar100-prog-warmup25-S3-4000t.yaml
+    ├── cifar100-prog-warmup25-S5-4000t.yaml
+    ├── cifar100-prog-warmup25-S8-4000t.yaml
+    ├── cifar100-prog-warmup100-S2.yaml
+    ├── cifar100-prog-warmup200-S2.yaml
+    ├── cifar100-prog-warmup25-375u-4000t.yaml
+    └── cifar100-prog-warmup25-375u.yaml
 ```
