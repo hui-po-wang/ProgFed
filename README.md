@@ -18,7 +18,7 @@
 ```
 ------------------------------------
 ## Quick Start
-To quickly reproduce the main result of our work, follow the instructions below.
+To quickly reproduce the main result of our work, prepare the [datasets](#datasets) and follow the instructions below.
 
 - Modify the ```--data_path``` argument in ```main.py``` accordingly (or specify it in the scripts)
 - Run scripts
@@ -34,6 +34,9 @@ bash exec_prog.sh
 - Pytorch >= 1.8.0
 - torchvision >= 0.9.1
 - idx2numpy >= 1.2.3
+------------------------------------
+## Datasets
+- [CIFAR-100](https://www.tensorflow.org/federated/api_docs/python/tff/simulation/datasets/cifar100/load_data)
 ------------------------------------
 ## Reproduce Results
 In ```script-fed/```, we provide ```exec_baseline.sh``` and ```exec_fed.sh``` for reproducing the experiments with an end-to-end baseline model and with our progressive training algorithm. We also offer detailed usage as follows.
