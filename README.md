@@ -32,6 +32,8 @@ bash exec_prog.sh
 ------------------------------------
 ## Installation
 - Pytorch >= 1.8.0
+- torchvision >= 0.9.1
+- idx2numpy >= 1.2.3
 ------------------------------------
 ## Reproduce Results
 In ```script-fed/```, we provide ```exec_baseline.sh``` and ```exec_fed.sh``` for reproducing the experiments with an end-to-end baseline model and with our progressive training algorithm. We also offer detailed usage as follows.
