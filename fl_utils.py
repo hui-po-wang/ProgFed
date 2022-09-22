@@ -117,7 +117,7 @@ def update_model(model, buffer, args):
                 break
             data = buffer['gradient_data'][i][k]
             
-            if q_option in ['dp_both', 'dp_up']:
+            if q_option == 'dp-client':
                 pass
             elif q_option == 'none':
                 data = data
@@ -131,12 +131,11 @@ def update_model(model, buffer, args):
 
             if sparse == 1:
                 grad_out += - data * 600 / weight
-            elif sparse > 0 and sparse < 1:
+            elif sparse > 0 and sparse < 1 and not q_option == 'dp-client':
                 mask = (torch.rand(data.size()) < sparse).type(data.type()).cuda()
                 grad_out += - data * mask  / sparse * 600 / weight
             else:
-                print("Unexpected sparsification ratio:", sys.exc_info()[0])
-                raise RuntimeError from OSError
+                raise ValueError(f'Not valid sparsification ratios ({sparse}) or options {q_option}')
 
         if args.n_update_client > n_nan:
             p.data.add_( grad_out.cuda() )
