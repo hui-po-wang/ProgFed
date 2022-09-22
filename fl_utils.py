@@ -43,28 +43,10 @@ def adjust_learning_rate(optimizer, lr):
         param_group['lr'] = lr
 
 def set_model(src, dst, args):
-    if args.quantize_option == 'dp_both':
-        const_c = np.sqrt(2*np.log(1.25/args.delta))
-        N = args.n_client
-        K = args.n_update_client
-        L = (args.n_update_client / args.n_client) * args.epochs
-        T = args.epochs
-        if args.n_client != args.n_update_client:        
-            b = -T/args.epsilon * np.log(1-N/K+N/K*np.exp(-args.epsilon/T))
-            gamma = -np.log(1-K/N+K/N*np.exp(-args.epsilon/(L*np.sqrt(K))))
-
-            if T > (args.epsilon/gamma):
-                sigma = 2*const_c*args.quantize_clip*np.sqrt((T**2)/(b**2) - (L**2)*K)
-                # handle minimum data size m for different datasets
-                sigma /= (500 * K * args.epsilon)
-            else:
-                sigma = 0
-        else:
-            raise NotImplementedError()
-    for s, d in zip( src.parameters() , dst.parameters() ):
-        if args.quantize_option == 'dp-both':
-            d.data = add_dp_noise(s.data.detach().clone(), sigma, quantize_clip)
-        else:
+    if args.quantize_option == 'dp-server':
+        raise NotImplementedError()
+    else:
+        for s, d in zip( src.parameters() , dst.parameters() ):
             d.data = s.data.detach().clone()
 
 def update_model_global_optim(global_optim, model, buffer, device, args):
@@ -72,23 +54,24 @@ def update_model_global_optim(global_optim, model, buffer, device, args):
     n_bits = args.quantize_bits
     sparse = args.sparse
 
-    ### FedAdam here
     global_optim.zero_grad()
-    #import pdb; pdb.set_trace()
-    for k, p in model.named_parameters(): 
-        weight = 600 * len(buffer['gradient_data'])
-        grad_out = 0
-        n_nan = 0
-        
-        #print(k)
-        for i in range(len(buffer['gradient_data'])):
-            # TODO: check whether the name of the current grad exists in the buffer
+
+    ###
+    # buffer[type_data][num_cients][name_layers]
+    ###
+    for i in range(len(buffer['gradient_data'])):
+        for k, p in model.named_parameters():
+            weight = 600 * len(buffer['gradient_data'])
+            grad_out = 0
+            n_nan = 0
+
             if not k in buffer['gradient_data'][i].keys():
-                break
+                continue
+
             data = buffer['gradient_data'][i][k]
 
-            if q_option in ['dp_both', 'dp_up']:
-                daga = data.cuda()
+            if q_option == 'dp-client':
+                raise NotImplementedError()
             elif q_option == 'none':
                 data = data.cuda()
             elif q_option == 'cosine':
@@ -107,16 +90,14 @@ def update_model_global_optim(global_optim, model, buffer, device, args):
                 grad_out += - data * 600 / weight
             elif sparse > 0 and sparse < 1:
                 mask = (torch.rand(data.size()) < sparse).type(data.type()).cuda()
-                #import pdb; pdb.set_trace()
                 grad_out += - data * mask  / sparse * 600 / weight
             else:
                 print("Unexpected sparsification ratio:", sys.exc_info()[0])
                 raise RuntimeError from OSError
 
-        if args.n_update_client > n_nan:
-            ### FedAdam here
-            p.grad.add_( -grad_out.cuda() )
-        
+            if args.n_update_client > n_nan:
+                p.grad.add_( -grad_out.cuda() )
+
     global_optim.step()
     
 def update_model(model, buffer, args):
