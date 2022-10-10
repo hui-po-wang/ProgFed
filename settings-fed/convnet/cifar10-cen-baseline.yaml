@@ -18,14 +18,14 @@ test-interval: 1
 arch: convnet
 lr_scheduler:
   type: multistep #cosine_decay #multistep #cosine
-  lr: 0.1
+  lr: 0.01
   milestones: [60, 120, 160]
   gamma: 0.2
   T_0: 1
   T_mult: 1
   eta_min: 0.01
 momentum: 0.9
-weight_decay: 0.0001
+weight_decay: 0.0005
 
 # parameter for federated configuration
 epoch-client: 1
