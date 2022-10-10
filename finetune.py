@@ -143,10 +143,9 @@ def main(args):
     # Initialize the model
     Network = getattr(models, args.arch)
     model_server = Network(args).to(device)
-    if args.strategy == 'baseline':
-        layer_cnt = 3
-    else:
-        layer_cnt = 0
+    
+    # This code is assumed to fine-tune a well-trained model
+    layer_cnt = 3
 
     if args.update_strategy == None:
         update_scheduler = UpdateScheduler(args.update_cycle, num_stages=4, update_strategy=None)
@@ -155,16 +154,26 @@ def main(args):
 
     print(update_scheduler)
     model_server.set_submodel(layer_cnt)
+
+    ##################
+    #
+    # Load model weights
+    #
+    ##################
+    model_load_tmp = torch.load(os.path.join(args.train_dir, 'model_epoch_199.tar'))
+    model.load_state_dict(model_load_tmp["state_dict"])
+
     print(model_server)
     submodel = model_server.gen_submodel().to(device)
     crit = nn.CrossEntropyLoss().to(device)
 
-    opt = torch.optim.SGD(submodel.parameters(), args['lr_scheduler']['lr'],
+    #opt = torch.optim.SGD(submodel.parameters(), args['lr_scheduler']['lr'],
+    opt = torch.optim.SGD(submodel.parameters(), lr=1e-4,
                                 momentum=args.momentum,
                                 weight_decay=args.weight_decay)
 
-    lr_scheduler = LearningScheduler(**args.lr_scheduler)
-    lr_scheduler.set_opt(opt)
+    #lr_scheduler = LearningScheduler(**args.lr_scheduler)
+    #lr_scheduler.set_opt(opt)
 
     # Initialize the dataset and the loader
     train_set, train_loader, val_set, val_loader = prepare_data(args)
@@ -180,68 +189,6 @@ def main(args):
         top1 = AverageMeter('Acc@1', ':6.2f')
         top5 = AverageMeter('Acc@5', ':6.2f')
         losses = AverageMeter('Losses', ':6.2f')
-
-        # Scheduling for progressive training
-        if args.strategy == 'random':
-            new_layer_cnt = np.random.randint(4)
-            if new_layer_cnt != layer_cnt:
-                layer_cnt = new_layer_cnt
-                model_server.set_submodel(layer_cnt)
-                submodel = model_server.gen_submodel().to(device)
-
-                opt = torch.optim.SGD(submodel.trainable_parameters(), args['lr_scheduler']['lr'],
-                                    momentum=args.momentum,
-                                    weight_decay=args.weight_decay)
-
-                lr_scheduler.set_opt(opt)
-        elif (args.strategy != 'baseline' and i_iter != 0 and 
-                i_iter == update_scheduler[layer_cnt] and layer_cnt < 3):
-            layer_cnt += 1
-            model_server.set_submodel(layer_cnt)
-            submodel = model_server.gen_submodel().to(device)
-            print(submodel)
-            if args.warmup and args.strategy != 'layerwise':
-                opt = torch.optim.SGD(submodel.lastest_parameters(), args['lr_scheduler']['lr'],
-                                momentum=args.momentum,
-                                weight_decay=args.weight_decay)
-                accu_cost += sum(p.numel() for p in submodel.lastest_parameters())
-                for i, (x, y) in enumerate(train_loader):
-                    x = x.to(device)
-                    y = y.to(device)
-
-                    if args.strategy == 'mixed':
-                        loss = 0.5 * crit(submodel(x), y) + 0.5 * crit(model_server(x), y)
-                    elif args.strategy == 'dense':
-                        preds = submodel(x)
-                        preds = preds[:-1] if len(preds) == args.num_stages else preds
-                        loss = 0
-                        for p in preds:
-                            loss += crit(p, y)
-                        loss += crit(model_server(x), y)
-                    else:
-                        pred = submodel(x)
-                        loss = crit(pred, y)
-
-                        opt.zero_grad()
-                        loss.backward()
-                        opt.step()
-
-            if args.strategy == 'layerwise':
-                opt = torch.optim.SGD(submodel.lastest_parameters(), args['lr_scheduler']['lr'],
-                                momentum=args.momentum,
-                                weight_decay=args.weight_decay)
-            elif args.strategy == 'mixed' or args.strategy == 'dense':
-                opt = torch.optim.SGD(list(submodel.trainable_parameters())+list(model_server.fc.parameters()),
-                                    args['lr_scheduler']['lr'],
-                                    momentum=args.momentum,
-                                    weight_decay=args.weight_decay)
-            elif args.strategy == 'progressive' or args.strategy == 'partial':
-                opt = torch.optim.SGD(submodel.trainable_parameters(), args['lr_scheduler']['lr'],
-                                    momentum=args.momentum,
-                                    weight_decay=args.weight_decay)
-            else:
-                raise NotImplementedError()
-            lr_scheduler.set_opt(opt)
 
         # record communication cost
         if args.strategy == 'layerwise':
@@ -285,7 +232,7 @@ def main(args):
         stats.add('lr', lr_scheduler.get_lr())
 
         # update learning rate
-        lr_scheduler.step()
+        #lr_scheduler.step()
 
         # TO-DO record accuracy, evaluate on val, and save models
         if i_iter == 0 or (i_iter+1) % args.save_freq == 0:
@@ -324,7 +271,7 @@ def main(args):
             else:
                 print(f'Validation Epoch {i_iter}: acc@1={top1.avg}')
 
-            file_name = os.path.join(args.train_dir, 'model_epoch_{}.tar'.format(i_iter))
+            file_name = os.path.join(args.train_dir, 'model_epoch_ft_{}.tar'.format(i_iter))
             torch.save({
                 'args': vars(args),
                 'epoch': i_iter,

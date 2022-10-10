@@ -8,8 +8,6 @@ def get_outdim(dset):
         return 100
     elif dset == 'cifar10' or dset == 'mnist':
         return 10
-    elif dset == 'emnist':
-        return 62
     else:
     	raise NotImplementedError()
 
@@ -32,7 +30,8 @@ class SingleSubModel(nn.Module):
         for m in self.enc:
             out = m(out)
             feats.append(out)
-
+        
+        #print(feats[-1].size())
         if not verbose:
             return self.head(feats[-1])
         else:
@@ -43,16 +42,9 @@ class SingleSubModel(nn.Module):
             print(n, p)
 
     def trainable_parameters(self):
-        # svcca gradually fix the lower-level layers to reduce the cost
-        if self.strategy == 'svcca':
-            for i in range(self.ind, 4):
-                for name, param in self.enc[i].named_parameters():
-                    yield param
-        else:
-            for i in range(self.ind+1):
-                for name, param in self.enc[i].named_parameters():
-                    yield param
-
+        for i in range(self.ind+1):
+            for name, param in self.enc[i].named_parameters():
+                yield param
         for name, param in self.head.named_parameters():
             yield param
 

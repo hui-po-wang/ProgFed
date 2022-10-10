@@ -1,6 +1,5 @@
-saves/
-runs/
+.DS_store
 __pycache__
-*tar
 *txt
-.DS_Store
+runs/
+saves/

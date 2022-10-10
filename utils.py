@@ -1,27 +1,17 @@
 import argparse
-import os
 import torch
 import numpy as np
 
 from scipy.special import softmax
 
-from torch.utils.data import Dataset
-
-from PIL import Image
-
 choice_dict = {}
-choice_dict['strategy'] = ['baseline', 'progressive', 'partial', 'layerwise', 'mixed', 'dense', 'svcca']
-choice_dict['dataset'] = ['cifar100', 'cifar10', 'mnist', 'imagenet', 'emnist']
-choice_dict['optimization'] = ['fedavg', 'fedprox', 'scaffold', 'fedadam']
+choice_dict['strategy'] = ['baseline', 'progressive', 'partial', 'layerwise', 'mixed', 'dense', 'random']
+choice_dict['dataset'] = ['cifar100', 'cifar10', 'mnist', 'imagenet']
 
 default_dict =  {}
 default_dict['warmup'] = False
-default_dict['warmup_epochs'] = 1
 default_dict['num_stages'] = 4
 default_dict['update_strategy'] = None
-default_dict['optimization'] = 'fedavg'
-default_dict['mu_loss_prox'] = 1e-1
-default_dict['global_lr'] = 1.0
 
 class Parser(dict):
     def __init__(self, *args):
@@ -44,11 +34,6 @@ class Parser(dict):
         for k in default_dict.keys():
             if k not in self.keys():
                 self[k] = default_dict[k] 
-
-        # Only ProgFed supports different optimization methods
-        if (not self['strategy'] in ['baseline', 'progressive'] 
-            and not self['optimization'] == 'fedavg'):
-            raise NotImplementedError(f'Only ProgFed and baselines support different optimization methods.')
 
     def __getattr__(self, name):
         return self[name]
@@ -98,7 +83,6 @@ class UpdateScheduler(object):
         for i in range(1, len(self.update_cycles)):
             self.update_cycles[i] += self.update_cycles[i-1]
         self.update_cycles = np.append(self.update_cycles, [1e9])
-        self.update_cycles = self.update_cycles.astype(np.int)
 
     def normalize(self, total=75, inverse=False):
         # discard the last one since it will become end-to-end.
@@ -112,27 +96,17 @@ class UpdateScheduler(object):
 
 
 class LearningScheduler(object):
-    def __init__(self, args):
-        kwargs = args.lr_scheduler
-        self.kwargs = kwargs
-        self.args = args
+    def __init__(self, **kwargs):
         self.type = kwargs['type']
         dummy_opt = torch.optim.SGD(torch.nn.Linear(1,1).parameters(), lr=kwargs['lr'])
-        self.manual_function = None
         if self.type == 'multistep':
             self.lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(
                 dummy_opt, milestones=kwargs['milestones'], gamma=kwargs['gamma'])
-        elif self.type == 'cosine_restart':
+        elif self.type == 'cosine':
             self.lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(dummy_opt, 
                 T_0=kwargs['T_0'], T_mult=kwargs['T_mult'], eta_min=kwargs['eta_min'])
-        elif self.type == 'cosine_decay':
-            self.manual_function = self._cosine_decay
-        elif self.type == 'constant':
-            self.manual_function = self._constant
-        elif self.type == 'piecewise_constant':
-            self.manual_function = self._piecewise_constant
         else:
-            raise NotImplementedError(f'Unknown lr scheduler {self.type}')
+            raise NotImplementedError()
 
         self.opt = None
         self.step_cnt = 0
@@ -153,75 +127,13 @@ class LearningScheduler(object):
             self.lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(dummy_opt, 
                 T_0=kwargs['T_0'], T_mult=kwargs['T_mult'], eta_min=kwargs['eta_min'])
         '''
-        if self.manual_function is None:
-            self.lr_scheduler.step()
+
+        self.lr_scheduler.step()
         for g in self.opt.param_groups:
             g['lr'] = self.get_lr()
 
     def get_lr(self):
-        if self.manual_function is None: 
-            return self.lr_scheduler.get_last_lr()[0]
-        else:
-            return self.manual_function()
-
-    def _cosine_decay(self):
-        return max(self.kwargs['lr'] * (1 + np.cos(np.pi * (self.step_cnt-1) / (self.args.epochs-1) ) ) / 2 , 1e-6)
-
-    def _constant(self):
-        return self.kwargs['lr']
-
-    def _piecewise_constant(self):
-        break_point = self.args.epochs // 2 - self.args.epochs // (2 * self.args.num_stages)
-        remaining_epochs = self.args.epochs - break_point
-        if self.step_cnt < break_point:
-            return self.kwargs['lr']
-        else:
-            return max(self.kwargs['lr'] * (1 + np.cos(np.pi * (self.step_cnt-1) / (self.args.epochs-1) ) ) / 2 , 1e-6)
-            #return max(self.kwargs['lr'] 
-            #    * (1 + np.cos(np.pi * ((self.step_cnt-break_point)-1) / (remaining_epochs-1) ) ) / 2 , 1e-6)
-
-
-class Cifar100_FL_Dataset(Dataset):
-    def __init__(self, root_dir, client_index, transform=None):
-        self.root_dir = os.path.join(root_dir, 'cifar-100-python_federated', 'cifar100_fl', f'{client_index:03d}')
-        self.targets = list(np.load('%s/gt.npy'% (self.root_dir)))
-        self.transform = transform
-        self.data = []
-        
-        for i_img in range(len(self.targets)):
-            self.data.append(np.array(Image.open( "%s/%03d.png"%(self.root_dir,i_img))))
-
-    def __len__(self):
-        return len(self.targets)
-
-    def __getitem__(self, index):
-        img, target = self.data[index], self.targets[index]
-
-        img = Image.fromarray(img)
-
-        if self.transform is not None:
-            img = self.transform(img)
-
-        return img, target
-
-class EMNIST_FL_Dataset(Dataset):
-    def __init__(self, data, targets, transform=None):
-        self.data = data
-        self.targets = targets
-        self.transform = transform
-
-    def __len__(self):
-        return len(self.targets)
-
-    def __getitem__(self, index):
-        img, target = self.data[index], self.targets[index]
-
-        img = Image.fromarray(img)
-
-        if self.transform is not None:
-            img = self.transform(img)
-
-        return img, np.int64(target)
+        return self.lr_scheduler.get_last_lr()[0]
 
 class AverageMeter(object):
     """Computes and stores the average and current value"""

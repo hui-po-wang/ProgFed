@@ -136,7 +136,7 @@ class VGG(nn.Module):
 
         return total
 
-def make_layers(cfg, batch_norm=False):
+def make_layers(cfg, batch_norm=False, dropout=False):
     models = nn.ModuleList()
 
     input_channel = 3
@@ -153,6 +153,9 @@ def make_layers(cfg, batch_norm=False):
                 layers += [nn.BatchNorm2d(l)]
 
             layers += [nn.ReLU(inplace=True)]
+
+            if dropout:
+                layers += [nn.Dropout2d(0.1)]
             input_channel = l
         models.append(nn.Sequential(*layers))
 
@@ -169,12 +172,6 @@ def vgg16_bn(args):
 
 def vgg19_bn(args):
     return VGG(make_layers(cfg['E'], batch_norm=True), args.dataset, args.strategy)
-
-def vgg16(args):
-    return VGG(make_layers(cfg['D'], batch_norm=False), args.dataset, args.strategy)
-
-def vgg19(args):
-    return VGG(make_layers(cfg['E'], batch_norm=False), args.dataset, args.strategy)
 
 if __name__ == '__main__':
     import argparse

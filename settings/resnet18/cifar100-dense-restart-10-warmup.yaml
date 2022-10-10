@@ -1,0 +1,23 @@
+# most of the setting copied from https://github.com/weiaicunzai/pytorch-cifar100
+# training settings
+seed: 6660857
+dataset: cifar100
+strategy: dense
+update-cycle: 25
+batch_size: 128
+epochs: 200
+save-freq: 10
+warmup: True
+
+# model settings
+arch: resnet18
+lr_scheduler:
+  type: cosine #multistep #cosine
+  lr: 0.1
+  milestones: [60, 120, 160]
+  gamma: 0.2
+  T_0: 10
+  T_mult: 1
+  eta_min: 0
+momentum: 0.9
+weight_decay: 0.0005
