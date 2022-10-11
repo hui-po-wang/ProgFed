@@ -6,6 +6,7 @@ update-cycle: 25
 batch_size: 50
 test-batch-size: 50
 epochs: 200
+warmup: True
 
 # parameters for logging
 save-freq: 10
